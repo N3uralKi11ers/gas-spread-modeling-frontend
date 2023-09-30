@@ -8,6 +8,8 @@ import {
 	Typography,
 } from '@mui/material'
 import { ChangeEvent, useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { DataForSend } from '../shared/interfaces/dataForSend'
 
 const Home = () => {
 	const [file, setFile] = useState<File>()
@@ -15,49 +17,66 @@ const Home = () => {
 	const [positions, setPositions] = useState<
 		{ x: number; y: number; gasType: string }[]
 	>([])
+	const navigation = useNavigate()
+
 	const canvasRef = useRef<HTMLCanvasElement>(null)
+	const canvas = canvasRef.current
+	if (canvas && !positions.length) {
+		canvas.width = canvas.parentElement?.clientWidth || 0
+		canvas.height = canvas.parentElement?.clientHeight || 0
+	}
 
 	useEffect(() => {
-		if (gasType) {
-			const imgCanvas = document.getElementById('imgCanvas')
-			const canvas = canvasRef.current
-			const context = canvas?.getContext('2d')
+		const canvas = canvasRef.current
+
+		if (gasType && canvas) {
+			const context = canvas.getContext('2d')
 
 			const handleClick = (e: MouseEvent) => {
 				setPositions(prev => [...prev, { x: e.offsetX, y: e.offsetY, gasType }])
 
-				if (context && canvas) {
-					const x = e.offsetX - canvas.offsetLeft
-					const y = e.offsetY - canvas.offsetTop
-
+				if (context) {
 					context.beginPath()
-					context.fillStyle = 'red'
-					context.arc(x, y, 5, 0, 2 * Math.PI)
+					context.fillStyle = !positions.length ? 'green' : 'red'
+					context.arc(e.offsetX, e.offsetY, 10, 0, 2 * Math.PI)
 					context.fill()
 				}
 			}
 
-			imgCanvas?.addEventListener('click', handleClick)
+			canvas?.addEventListener('click', handleClick)
 
 			return () => {
-				imgCanvas?.removeEventListener('click', handleClick)
+				canvas?.removeEventListener('click', handleClick)
 			}
 		}
-	}, [gasType])
-
-	console.log(positions)
+	}, [gasType, positions.length])
 
 	const handleSaveFile = (e: ChangeEvent<HTMLInputElement>) => {
 		if (e && e?.target && e.target?.files) {
 			setFile(e.target.files[0])
-			// const formData = new FormData()
-			// formData.append('file', e.target.files[0])
-			// setFile(formData)
 		}
 	}
 
 	const handleSend = () => {
-		console.log(file)
+		//TODO: нужно для отправки
+		if (file) {
+			const formData = new FormData()
+			formData.append('file', file)
+
+			//TODO: доделать
+			const dataForSend: DataForSend = {
+				person: { v: 1 },
+				markers: positions.map((position, index) => ({
+					place: { point: index === 0 ? 0 : 1, gases: [{ gas: 0, v: 0 }] },
+					x: position.x,
+					y: position.y,
+				})),
+			}
+			console.log(dataForSend)
+		}
+
+		setPositions([])
+		navigation('/result')
 	}
 
 	return (
@@ -76,7 +95,6 @@ const Home = () => {
 					width: '15rem',
 					border: 'dashed',
 					borderColor: '#1976D2',
-					borderWidth: '0.2rem',
 					position: 'relative',
 					display: 'flex',
 					justifyContent: 'center',
@@ -107,16 +125,18 @@ const Home = () => {
 							<>Выберите позиции газа</>
 						)}
 					</Typography>
-					<Box sx={{ position: 'relative', height: '30rem' }}>
+					<Box
+						sx={{
+							position: 'relative',
+							height: '30rem',
+							outline: 'dashed',
+							outlineColor: '#1976D2',
+						}}
+					>
 						<canvas
 							style={{
-								width: '100%',
-								height: '100%',
 								position: 'absolute',
-								top: 0,
-								left: 0,
 							}}
-							id='imgCanvas'
 							ref={canvasRef}
 						/>
 						<img style={{ height: '30rem' }} src={URL.createObjectURL(file)} />
@@ -140,9 +160,11 @@ const Home = () => {
 					</FormControl>
 				</Box>
 			)}
-			<Button variant='contained' onClick={handleSend}>
-				Отправить
-			</Button>
+			{positions.length > 1 && (
+				<Button variant='contained' onClick={handleSend}>
+					Отправить
+				</Button>
+			)}
 		</Box>
 	)
 }
