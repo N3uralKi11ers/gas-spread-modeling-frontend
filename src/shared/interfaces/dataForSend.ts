@@ -1,16 +1,16 @@
 export interface DataForSend {
 	person: {
-		v: number
-	}
-	markers: {
-		place: {
-			point: number
-			gases: {
-				gas: number
-				v: number
-			}[]
+		pos: {
+			x: number
+			y: number
 		}
-		x: number
-		y: number
+		velocity: number
+	}
+	gases: {
+		pos: { x: number; y: number }
+		gas_type: number
 	}[]
+	evacuation_map: {
+		ev_map: number[][]
+	}
 }

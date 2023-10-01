@@ -3,12 +3,15 @@ import {
 	Button,
 	FormControl,
 	InputLabel,
+	LinearProgress,
 	MenuItem,
 	Select,
 	Typography,
 } from '@mui/material'
 import { ChangeEvent, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useMutation } from '@tanstack/react-query'
+import axios from 'axios'
 import { DataForSend } from '../shared/interfaces/dataForSend'
 
 const Home = () => {
@@ -25,6 +28,49 @@ const Home = () => {
 		canvas.width = canvas.parentElement?.clientWidth || 0
 		canvas.height = canvas.parentElement?.clientHeight || 0
 	}
+
+	const mutationImg = useMutation({
+		mutationFn: async (img: FormData) => {
+			const data: number[][] = await (
+				await axios.post(
+					'http://localhost:8000/api/v1/process_evacuation_map',
+					img
+				)
+			).data
+
+			return data
+		},
+	})
+
+	const mutationPos = useMutation({
+		mutationFn: async (ev_map: number[][]) => {
+			const dataForSend: DataForSend = {
+				person: {
+					pos: {
+						x: positions[0].x,
+						y: positions[0].y,
+					},
+					velocity: 1,
+				},
+				gases: positions.slice(1).map(position => ({
+					pos: { x: position.x, y: position.y },
+					gas_type: +position.gasType,
+				})),
+				evacuation_map: {
+					ev_map,
+				},
+			}
+
+			const data: number[][] = await (
+				await axios.post(
+					'http://localhost:8000/api/v1/process_time_series',
+					dataForSend
+				)
+			).data
+
+			return data
+		},
+	})
 
 	useEffect(() => {
 		const canvas = canvasRef.current
@@ -58,26 +104,23 @@ const Home = () => {
 	}
 
 	const handleSend = () => {
-		//TODO: нужно для отправки
 		if (file) {
 			const formData = new FormData()
 			formData.append('file', file)
-
-			//TODO: доделать
-			const dataForSend: DataForSend = {
-				person: { v: 1 },
-				markers: positions.map((position, index) => ({
-					place: { point: index === 0 ? 0 : 1, gases: [{ gas: 0, v: 0 }] },
-					x: position.x,
-					y: position.y,
-				})),
-			}
-			console.log(dataForSend)
+			mutationImg.mutate(formData)
 		}
-
-		setPositions([])
-		navigation('/result')
 	}
+
+	useEffect(() => {
+		if (mutationImg.isSuccess) {
+			console.log(mutationImg.data)
+			localStorage.setItem('imgData', JSON.stringify(mutationImg.data))
+
+			mutationPos.mutate(mutationImg.data)
+
+			navigation('/result')
+		}
+	}, [mutationImg.data, mutationImg.isSuccess, mutationPos, navigation])
 
 	return (
 		<Box
@@ -160,10 +203,14 @@ const Home = () => {
 					</FormControl>
 				</Box>
 			)}
-			{positions.length > 1 && (
-				<Button variant='contained' onClick={handleSend}>
-					Отправить
-				</Button>
+			{mutationImg.isLoading ? (
+				<LinearProgress />
+			) : (
+				positions.length > 1 && (
+					<Button variant='contained' onClick={handleSend}>
+						Отправить
+					</Button>
+				)
 			)}
 		</Box>
 	)
